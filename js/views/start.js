@@ -1,0 +1,169 @@
+// Pantallas sin espacio cargado: configuración pendiente, inicio (crear / demostración),
+// enlace recién creado, enlace no válido, carga y error de carga.
+
+import { h, icon, button, linkBox, field, textInput, setFieldError, clearFieldErrors, notice } from '../ui.js';
+import { generateSecret } from '../api.js';
+import { spaceLink } from '../router.js';
+
+function screen(...children) {
+  return h('div', { class: 'screen' }, h('div', { class: 'screen-card' }, children));
+}
+
+function brandMark() {
+  return h('div', { class: 'screen-brand' }, icon('logo', 'brand-mark-large'), h('span', null, 'Rumbo'));
+}
+
+// ---------- Falta configurar Supabase ----------
+
+export function renderSetupMissing() {
+  const steps = [
+    ['Crea un proyecto gratuito en ', h('strong', null, 'supabase.com'), '.'],
+    ['Abre ', h('strong', null, 'SQL Editor'), ', pega todo el contenido del archivo ', h('code', null, 'supabase/schema.sql'), ' de este repositorio y pulsa ', h('strong', null, 'Run'), '.'],
+    ['En ', h('strong', null, 'Project Settings → API'), ' (o «API Keys»), copia la ', h('strong', null, 'Project URL'), ' y la clave pública ', h('strong', null, 'anon'), ' o ', h('strong', null, 'publishable'), '.'],
+    ['Pega esos dos valores en el archivo ', h('code', null, 'config.js'), ' y sube el cambio a GitHub.'],
+    ['Espera un minuto a que GitHub Pages publique el cambio y recarga esta página.'],
+  ];
+  return screen(
+    brandMark(),
+    h('h1', { class: 'screen-title' }, 'Falta conectar la base de datos'),
+    h('p', { class: 'screen-text' }, 'Esta web guarda vuestros datos en un proyecto de Supabase que todavía no está configurado. Son unos minutos y solo hay que hacerlo una vez:'),
+    h('ol', { class: 'steps' }, steps.map((s) => h('li', null, s))),
+    notice('warning', 'Usa solo la clave pública (anon / publishable). Nunca pongas en config.js la clave service_role ni la clave secret.'),
+    h('p', { class: 'screen-foot' }, 'Tienes los pasos detallados en el archivo README.md del repositorio.'),
+  );
+}
+
+// ---------- Inicio sin secreto ----------
+
+export function renderHome(app) {
+  let pending = null; // { secret, demo } reutilizado al reintentar tras un fallo de red
+  let busy = false;
+
+  const codeInput = textInput({ autocomplete: 'off', spellcheck: 'false', maxlength: 200 });
+  const codeField = field({ label: 'Código de configuración', control: codeInput, name: 'setup_code', hint: 'Lo eligió quien instaló esta web. Pídeselo si no lo tienes.' });
+  codeField.hidden = true;
+
+  const alertBox = h('div', { class: 'form-alert', role: 'alert', hidden: true });
+  const createBtn = button('Crear nuestro espacio', null, { variant: 'primary', extraClass: 'btn-block', type: 'submit' });
+  const demoBtn = button('Ver una demostración', () => create(true), { variant: 'plain', extraClass: 'btn-block' });
+
+  function setAlert(message, retry) {
+    alertBox.replaceChildren(icon('alert'), h('span', { class: 'form-alert-text' }, message));
+    if (retry) alertBox.append(h('div', { class: 'form-alert-actions' }, button('Reintentar', retry, { small: true })));
+    alertBox.hidden = false;
+  }
+
+  function setBusy(value, demo) {
+    busy = value;
+    createBtn.disabled = value;
+    demoBtn.disabled = value;
+    createBtn.querySelector('span').textContent = value && !demo ? 'Creando…' : 'Crear nuestro espacio';
+    demoBtn.querySelector('span').textContent = value && demo ? 'Preparando la demostración…' : 'Ver una demostración';
+    (demo ? demoBtn : createBtn).setAttribute('aria-busy', String(value));
+  }
+
+  async function create(demo) {
+    if (busy) return;
+    alertBox.hidden = true;
+    clearFieldErrors(card);
+    if (!pending || pending.demo !== demo) pending = { secret: generateSecret(), demo };
+    const { secret } = pending;
+    const setupCode = demo ? null : codeInput.value.trim() || null;
+    setBusy(true, demo);
+    let ok = false;
+    try {
+      await app.api.createSpace(secret, { demo, setupCode });
+      ok = true;
+    } catch (err) {
+      if (err && err.retryable) {
+        // Puede que se creara y se perdiera la respuesta: si el secreto ya funciona, está hecho.
+        try { await app.api.getRev(secret); ok = true; } catch { /* sigue fallando */ }
+        if (!ok) setAlert(err.message, () => create(demo));
+      } else {
+        pending = null;
+        handleError(err);
+      }
+    } finally {
+      setBusy(false, demo);
+    }
+    if (ok) {
+      pending = null;
+      app.openSpace(secret, demo ? { name: 'summary' } : { name: 'welcome' });
+    }
+  }
+
+  function handleError(err) {
+    const code = err && err.code;
+    if (code === 'setup_code_required' || (code === 'validation' && err.fields && err.fields.setup_code)) {
+      codeField.hidden = false;
+      setFieldError(card, 'setup_code', (err.fields && err.fields.setup_code) || err.message);
+      codeInput.focus();
+      return;
+    }
+    setAlert(err && err.message ? err.message : 'Algo no ha ido bien. Inténtalo de nuevo.', null);
+  }
+
+  const form = h('form', { class: 'form home-form', novalidate: true }, codeField, alertBox, createBtn);
+  form.addEventListener('submit', (e) => { e.preventDefault(); create(false); });
+
+  const card = screen(
+    brandMark(),
+    h('h1', { class: 'screen-title' }, 'Vuestros ahorros y objetivos, en común'),
+    h('p', { class: 'screen-text' }, 'Un espacio privado para dos personas: cuánto tenéis ahorrado, para qué lo estáis reservando y qué pasos faltan.'),
+    form,
+    demoBtn,
+    h('p', { class: 'screen-foot' }, 'No hay cuentas ni contraseñas: entraréis con un enlace privado que podréis compartir entre vosotros.'),
+  );
+  return card;
+}
+
+// ---------- Enlace recién creado ----------
+
+export function renderWelcome(app, secret) {
+  const url = spaceLink(secret);
+  return screen(
+    brandMark(),
+    h('div', { class: 'screen-icon is-success' }, icon('checkCircle')),
+    h('h1', { class: 'screen-title' }, 'Vuestro espacio está listo'),
+    h('p', { class: 'screen-text' }, 'Este es vuestro enlace privado. Guardadlo en un lugar seguro (en favoritos o en vuestras notas) y compartidlo solo entre vosotros: es la única forma de entrar.'),
+    linkBox(url, { toastFn: app.toast }),
+    notice('warning', 'Cualquier persona con este enlace puede ver y editar vuestro espacio. Si alguna vez se comparte por error, podréis regenerarlo desde Ajustes.'),
+    button('Abrir el dashboard', () => app.openSpace(secret), { variant: 'primary', extraClass: 'btn-block' }),
+  );
+}
+
+// ---------- Enlace no válido ----------
+
+export function renderInvalid(app) {
+  return screen(
+    brandMark(),
+    h('div', { class: 'screen-icon' }, icon('link')),
+    h('h1', { class: 'screen-title' }, 'Este enlace ya no es válido'),
+    h('p', { class: 'screen-text' }, 'Puede que esté incompleto o que se haya regenerado desde otro dispositivo. Pide el enlace nuevo a la otra persona del espacio.'),
+    button('Ir al inicio', () => app.goHome(), { variant: 'secondary', extraClass: 'btn-block' }),
+  );
+}
+
+// ---------- Carga ----------
+
+export function renderLoading(text = 'Cargando vuestro espacio…') {
+  return h('div', { class: 'screen screen-loading', role: 'status', 'aria-live': 'polite' },
+    h('div', { class: 'spinner', 'aria-hidden': 'true' }),
+    h('p', { class: 'screen-text' }, text));
+}
+
+const ERROR_TITLES = {
+  not_installed: 'La base de datos no está preparada',
+  bad_config: 'No se puede conectar con Supabase',
+};
+
+export function renderLoadError(app, err, retry) {
+  const code = err && err.code;
+  return screen(
+    brandMark(),
+    h('div', { class: 'screen-icon is-warning' }, icon(code === 'network' ? 'cloudOff' : 'alert')),
+    h('h1', { class: 'screen-title' }, ERROR_TITLES[code] || 'No hemos podido cargar vuestro espacio'),
+    h('p', { class: 'screen-text' }, err && err.message ? err.message : 'Algo no ha ido bien. Inténtalo de nuevo.'),
+    button('Reintentar', retry, { variant: 'primary', extraClass: 'btn-block', iconName: 'refresh' }),
+  );
+}
