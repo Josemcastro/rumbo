@@ -5,7 +5,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const C = (cx, cy, r) => ({ c: [cx, cy, r] });
 
 export const ICONS = {
-  logo: [C(12, 12, 9), 'M15.5 8.5l-2 5-5 2 2-5z'],
+  // Diana con una flecha entrando: los anillos se abren por donde entra.
+  logo: ['M13.2 4.79A8.5 8.5 0 1 0 19.21 10.8', 'M12.54 8.77A4.5 4.5 0 1 0 15.23 11.46', C(11, 13, 1), 'M11 13l8.5-8.5', 'M19.5 4.5h3M19.5 4.5v-3'],
   plus: ['M12 5v14M5 12h14'],
   close: ['M6 6l12 12M18 6L6 18'],
   check: ['M5 12.5l4.5 4.5L19 7.5'],
