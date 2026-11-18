@@ -89,7 +89,7 @@ Si Realtime no funcionara, la web sigue funcionando: comprueba si hay cambios ca
 2. Pulsa **Crear nuestro espacio** (si configuraste un código en el paso 4, te lo pedirá).
 3. Verás **vuestro enlace privado**, del tipo `https://tu-usuario.github.io/rumbo/#XXXXXXXX…`. **Guardadlo** (en favoritos, en vuestras notas o en un gestor de contraseñas): es la única forma de entrar.
 4. Compártelo con tu pareja con **Copiar** o **Compartir** (por ejemplo, por un chat privado).
-5. Pulsa **Abrir el dashboard**.
+5. Pulsa **Entrar en nuestro espacio**.
 
 > **Cualquier persona que tenga el enlace puede ver y editar vuestro espacio.** No lo publiquéis ni lo enviéis a nadie más.
 
@@ -97,12 +97,14 @@ Si solo queréis curiosear antes, pulsad **Ver una demostración**: crea un espa
 
 ### 8. Primeros pasos dentro
 
-1. En **Ajustes**, poned vuestros nombres.
+La barra de abajo lleva a **Resumen**, **Objetivos**, **Ahorros** y **Ajustes**.
+
+1. En **Ajustes → Vosotros**, poned vuestros nombres. En **Ajustes → Apariencia** podéis elegir modo claro, oscuro o automático (en cada dispositivo).
 2. En **Ahorros**, pulsad **Registrar ahorros iniciales** y escribid cuánto tenéis ahorrado hoy en total.
-3. En **Resumen** (o dentro de una pestaña como «Vivienda»), pulsad **Nuevo objetivo**: nombre, meta en euros, pestaña, para quién y prioridad. En «Más opciones» podéis añadir fecha deseada, notas, un desglose del presupuesto y los primeros pasos.
+3. En **Objetivos**, pulsad **Nuevo objetivo**: nombre, meta en euros, pestaña, para quién y prioridad (si tenéis elegida una pestaña, como «Vivienda», se propone esa). En «Más opciones» podéis añadir fecha deseada, notas, un desglose del presupuesto y los primeros pasos. Las pestañas se crean, ordenan y renombran en **Ajustes → Pestañas de objetivos**.
 4. En cada objetivo, **Añadir aportación** permite:
-   - **Asignar de nuestros ahorros**: reservar para este objetivo dinero que ya teníais (sale de «Disponible»).
-   - **Registrar ahorro nuevo**: dinero que entra ahora y se reserva directamente para el objetivo.
+   - **Aportación nueva** (la opción por defecto): dinero que ponéis ahora, por ejemplo de la nómina. Se suma a vuestros ahorros y queda reservado para el objetivo.
+   - **Desde ahorros ya registrados**: reservar para este objetivo dinero que ya figuraba como disponible (sale de «Disponible»).
 5. Añadid las **tareas** que faltan al final del detalle del objetivo («Añadir una tarea…» y Enter) y marcadlas al completarlas.
 6. Cuando paguéis algo del objetivo, usad **Registrar pago** (en el menú «···» del bloque Dinero). Si el pago supera lo reservado, la web os ofrecerá cubrir la diferencia con el dinero disponible.
 
@@ -156,6 +158,7 @@ icon.svg                Icono
 robots.txt, .nojekyll   No indexar / servir los archivos tal cual en GitHub Pages
 js/                     Código de la aplicación (sin compilación)
   app.js                Arranque, sesión, ruteo y renderizado
+  theme-boot.js         Aplica el tema elegido (claro, oscuro o automático) antes de pintar
   api.js                Llamadas a Supabase (funciones RPC) y gestión de errores
   sync.js               Sincronización en tiempo real y sondeo de respaldo
   views/, forms/        Pantallas y formularios
