@@ -50,6 +50,57 @@ const prefs = {
   },
 };
 
+// ---------- Espacio recordado en este dispositivo ----------
+// Algunos móviles abren el acceso de la pantalla de inicio sin el fragmento de la
+// dirección (donde va el enlace privado). Para que aun así se entre directamente en
+// vuestro espacio, este dispositivo recuerda el último espacio real abierto. Nunca se
+// envía a ningún sitio; se olvida si el enlace deja de valer o desde Ajustes.
+// Las demostraciones no se recuerdan.
+
+const rememberKey = () => 'rumbo.space.' + (backendKind === 'pglite' ? 'local' : String(config.supabaseUrl || ''));
+const remembered = {
+  get() {
+    try {
+      const v = localStorage.getItem(rememberKey());
+      return v && isValidSecret(v) ? v : null;
+    } catch {
+      return null;
+    }
+  },
+  /** Recuerda el espacio, salvo que en Ajustes se pidiera no hacerlo en este dispositivo. */
+  set(secret) {
+    try {
+      if (localStorage.getItem(rememberKey() + '.off') === '1') return;
+      localStorage.setItem(rememberKey(), secret);
+    } catch { /* sin almacenamiento */ }
+  },
+  /** Ajustes → «Recordar en este dispositivo». */
+  enable(secret) {
+    try {
+      localStorage.removeItem(rememberKey() + '.off');
+      localStorage.setItem(rememberKey(), secret);
+    } catch { /* sin almacenamiento */ }
+  },
+  /** Ajustes → «Olvidar en este dispositivo». */
+  disable() {
+    try {
+      localStorage.removeItem(rememberKey());
+      localStorage.setItem(rememberKey() + '.off', '1');
+    } catch { /* sin almacenamiento */ }
+  },
+  /** Olvida el espacio; si se indica un secreto, solo si es ese. */
+  clear(secret = null) {
+    try {
+      if (!secret || localStorage.getItem(rememberKey()) === secret) localStorage.removeItem(rememberKey());
+    } catch { /* sin almacenamiento */ }
+  },
+};
+
+function isDemoState(state) {
+  const v = state && state.space ? state.space.is_demo : false;
+  return v === true || v === 1 || v === 't' || v === 'true';
+}
+
 // ---------- Objeto «app» que reciben las vistas y formularios ----------
 
 const app = {
@@ -60,6 +111,10 @@ const app = {
   get api() { return api; },
   prefs,
   memory: uiMemory,
+  /** ¿Este dispositivo recuerda el espacio abierto? */
+  get remembersSpace() { return !!session && remembered.get() === session.secret; },
+  forgetDevice() { remembered.disable(); },
+  rememberDevice() { if (session) remembered.enable(session.secret); },
   toast,
 
   names() { return memberNames(app.state && app.state.space); },
@@ -173,6 +228,7 @@ const app = {
   /** El enlace ya no es válido: se cierra todo y no se muestra ningún dato. */
   invalidate() {
     closeAllSheets();
+    if (session) remembered.clear(session.secret);
     if (session) {
       session.sync.stop();
       session.state = null;
@@ -207,6 +263,7 @@ const app = {
       }
     }
     if (s !== session) return;
+    if (remembered.get() === oldSecret) remembered.set(newSecret);
     s.secret = newSecret;
     history.replaceState(null, '', buildHash(newSecret, currentRoute));
     s.sync.switchSecret(newSecret, Number.isFinite(res.rev) ? res.rev : (s.state ? s.state.rev + 1 : 1));
@@ -266,6 +323,7 @@ async function loadInitial(s) {
     if (s !== session) return;
     s.state = state;
     s.status = 'ready';
+    if (!isDemoState(state)) remembered.set(s.secret);
     s.sync.start(s.secret);
     renderMain({ routeChanged: true });
   } catch (err) {
@@ -346,6 +404,12 @@ function renderMain({ routeChanged }) {
 function onHashChange() {
   const { secret, route } = parseHash(location.hash);
   if (!secret) {
+    const saved = remembered.get();
+    if (saved) {
+      history.replaceState(null, '', buildHash(saved, { name: 'summary' }));
+      onHashChange();
+      return;
+    }
     if (session) { session.sync.stop(); session = null; }
     closeAllSheets();
     currentRoute = { name: 'home' };
