@@ -1,7 +1,9 @@
 // Pantallas sin espacio cargado: configuración pendiente, inicio (crear / demostración),
 // enlace recién creado, enlace no válido, carga y error de carga.
 
-import { h, icon, button, linkBox, field, textInput, setFieldError, clearFieldErrors, notice } from '../ui.js';
+import {
+  h, icon, button, linkBox, field, textInput, setFieldError, clearFieldErrors, notice, appLogo, prefersReducedMotion,
+} from '../ui.js';
 import { generateSecret, isValidSecret } from '../api.js';
 import { spaceLink } from '../router.js';
 
@@ -19,7 +21,7 @@ function screen(...children) {
 }
 
 function brandMark() {
-  return h('div', { class: 'screen-brand' }, icon('logo', 'brand-mark-large'), h('span', null, 'Rumbo'));
+  return h('div', { class: 'screen-brand' }, appLogo(64, 'screen-logo'), h('span', null, 'Rumbo'));
 }
 
 // ---------- Falta configurar Supabase ----------
@@ -43,6 +45,9 @@ export function renderSetupMissing() {
 }
 
 // ---------- Inicio sin secreto ----------
+
+/** Tiempo que el logo se queda solo antes de mostrar las opciones (efecto «se abre la app»). */
+const HOME_REVEAL_MS = 650;
 
 export function renderHome(app) {
   let pending = null; // { secret, demo } reutilizado al reintentar tras un fallo de red
@@ -136,19 +141,25 @@ export function renderHome(app) {
     linkForm.hidden = false;
     haveBtn.hidden = true;
     linkInput.focus();
-  }, { variant: 'secondary', extraClass: 'btn-block', iconName: 'users' });
+  }, { variant: 'secondary', extraClass: 'btn-block' });
 
-  const card = screen(
-    brandMark(),
-    h('h1', { class: 'screen-title' }, 'Vuestros ahorros y objetivos, en común'),
-    h('p', { class: 'screen-text' }, 'Un espacio privado para dos personas: cuánto tenéis ahorrado, para qué lo estáis reservando y qué pasos faltan.'),
-    form,
-    haveBtn,
-    linkForm,
-    demoBtn,
-    h('p', { class: 'screen-foot' }, 'No hay cuentas ni contraseñas: entraréis con un enlace privado que podréis compartir entre vosotros.'),
-  );
-  return card;
+  // Primero se ve solo el logo, centrado; tras un instante se abren las tres opciones
+  // debajo (sin animación ni espera si se prefiere reducir el movimiento).
+  const reduce = prefersReducedMotion();
+  const reveal = h('div', { class: 'home-reveal', inert: reduce ? null : true },
+    h('div', { class: 'home-reveal-clip' },
+      h('div', { class: 'home-actions' }, form, haveBtn, linkForm, demoBtn)));
+  const card = h('div', { class: 'home-card' },
+    h('div', { class: 'home-brand' }, appLogo(112, 'home-logo'), h('h1', { class: 'home-name' }, 'Rumbo')),
+    reveal);
+  const page = h('div', { class: ['screen', 'home', reduce && 'is-open'] }, card);
+  if (!reduce) {
+    setTimeout(() => {
+      page.classList.add('is-open');
+      reveal.removeAttribute('inert');
+    }, HOME_REVEAL_MS);
+  }
+  return page;
 }
 
 // ---------- Enlace recién creado ----------
@@ -162,7 +173,7 @@ export function renderWelcome(app, secret) {
     h('p', { class: 'screen-text' }, 'Este es vuestro enlace privado. Guardadlo en un lugar seguro (en favoritos o en vuestras notas) y compartidlo solo entre vosotros: es la única forma de entrar.'),
     linkBox(url, { toastFn: app.toast }),
     notice('warning', 'Cualquier persona con este enlace puede ver y editar vuestro espacio. Si alguna vez se comparte por error, podréis regenerarlo desde Ajustes.'),
-    button('Abrir el dashboard', () => app.openSpace(secret), { variant: 'primary', extraClass: 'btn-block' }),
+    button('Entrar en nuestro espacio', () => app.openSpace(secret), { variant: 'primary', extraClass: 'btn-block' }),
   );
 }
 

@@ -1,7 +1,7 @@
 // Tarjetas de objetivo, filtro por estado, orden y cifras destacadas.
 
 import { h, icon, button, selectInput, nextId } from '../ui.js';
-import { formatCents, formatPercent, formatDate, todayISO } from '../format.js';
+import { formatCents, formatPercent } from '../format.js';
 import {
   STATUS_LABELS, STATUS_ICONS, PRIORITY_ORDER, FILTER_OPTIONS, SORT_OPTIONS,
 } from '../labels.js';
@@ -106,29 +106,26 @@ export function progressRing(goal) {
   }, svg, h('span', { class: 'ring-text', 'aria-hidden': 'true' }, text));
 }
 
-export function goalCard(app, goal, { showTab = false } = {}) {
+/**
+ * Tarjeta de objetivo: nombre, importe y círculo de progreso; nada más.
+ * - En Objetivos: «X € de Y €» (lo cubierto de la meta).
+ * - En el Resumen (`compact`): solo la meta.
+ * Si el objetivo no está activo, lleva su etiqueta de estado.
+ */
+export function goalCard(app, goal, { compact = false } = {}) {
   const c = computed(goal);
-  const funding = fundingLine(goal);
   const covered = c.covered_cents || 0;
   const target = c.target_cents || 0;
   const titleId = nextId('goal-title');
-  const tabName = showTab ? app.tabName(goal.tab_id) : null;
-  const foot = [];
-  if (c.tasks_total > 0) foot.push(h('span', null, icon('list'), `${c.tasks_done} de ${c.tasks_total} tareas`));
-  if (goal.desired_date) {
-    const late = goal.desired_date < todayISO() && (goal.status === 'active' || goal.status === 'paused') && c.funding_status !== 'funded';
-    foot.push(h('span', { class: late ? 'is-late' : null }, icon('calendar'), formatDate(goal.desired_date)));
-  }
 
-  return h('article', { class: ['goal-card', `is-${goal.status}`], 'aria-labelledby': titleId },
+  return h('article', { class: ['goal-card', compact && 'is-compact', `is-${goal.status}`], 'aria-labelledby': titleId },
     h('div', { class: 'goal-card-body' },
-      tabName ? h('p', { class: 'goal-card-meta' }, tabName) : null,
       h('h3', { class: 'goal-card-title', id: titleId },
         h('a', { href: app.href({ name: 'goal', id: goal.id }), class: 'stretched-link', dataset: { fk: `goal-${goal.id}` } }, goal.name)),
-      goal.status !== 'active' ? h('div', { class: 'goal-card-badge' }, statusBadge(goal.status)) : null,
-      h('p', { class: 'goal-card-amounts' }, h('strong', null, formatCents(covered)), ` de ${formatCents(target)}`),
-      h('p', { class: ['funding', `funding-${funding.tone}`] }, icon(funding.iconName), funding.text),
-      foot.length ? h('p', { class: 'goal-card-foot' }, foot) : null),
+      compact
+        ? h('p', { class: 'goal-card-amounts' }, h('span', { class: 'goal-card-label' }, 'Meta '), h('strong', null, formatCents(target)))
+        : h('p', { class: 'goal-card-amounts' }, h('strong', null, formatCents(covered)), ` de ${formatCents(target)}`),
+      goal.status !== 'active' ? h('div', { class: 'goal-card-badge' }, statusBadge(goal.status)) : null),
     progressRing(goal));
 }
 
@@ -140,8 +137,13 @@ function addGoalTile(app, tabId) {
   }, icon('plus'), h('span', null, 'Nuevo objetivo'));
 }
 
-/** Lista de tarjetas con controles, «Nuevo objetivo» (opcional) y estado vacío. */
-export function goalSection(app, goals, { showTab = false, tabId = null, heading = 'Objetivos', allowCreate = true } = {}) {
+/**
+ * Lista de tarjetas con «Mostrar» / «Ordenar por», «+ Nuevo objetivo» (opcional) y estado vacío.
+ * - `compact`: tarjetas del Resumen (solo nombre, meta y círculo).
+ * - `heading`: título visible de la sección; sin él, la sección se nombra con `label`.
+ * - `empty`: { text, action } para cuando no hay ningún objetivo y no se pueden crear aquí.
+ */
+export function goalSection(app, goals, { compact = false, tabId = null, heading = 'Objetivos', label = null, allowCreate = true, empty = null } = {}) {
   const filter = app.prefs.get('filter', 'active');
   const sort = app.prefs.get('sort', 'priority');
   const visible = sortGoals(filterGoals(goals, filter), sort);
@@ -150,21 +152,23 @@ export function goalSection(app, goals, { showTab = false, tabId = null, heading
   let note = null;
   if (!goals.length) {
     note = h('div', { class: 'empty empty-center' },
-      h('p', { class: 'empty-title' }, tabId ? 'Aún no hay objetivos en esta pestaña' : 'Aún no tenéis objetivos'),
-      h('p', { class: 'empty-text' }, allowCreate
+      h('p', { class: 'empty-title' }, tabId != null ? 'Aún no hay objetivos en esta pestaña' : 'Aún no tenéis objetivos'),
+      h('p', { class: 'empty-text' }, allowCreate || !empty
         ? 'Un objetivo es algo para lo que queréis ahorrar: la entrada de un piso, un viaje, la boda… Podéis añadirle una meta, un desglose y los pasos que faltan.'
-        : 'Cread el primero desde «Gestionar», en la barra de pestañas, o desde dentro de cualquier pestaña.'));
+        : empty.text),
+      !allowCreate && empty ? empty.action : null);
   } else if (!visible.length) {
-    const label = (FILTER_OPTIONS.find((o) => o.value === filter) || {}).label || '';
+    const filterLabel = (FILTER_OPTIONS.find((o) => o.value === filter) || {}).label || '';
     note = h('div', { class: 'empty empty-center' },
-      h('p', { class: 'empty-text' }, `No hay objetivos en «${label}».`),
-      button('Mostrar todos', () => { app.prefs.set('filter', 'all'); app.render(); }, { small: true }));
+      h('p', { class: 'empty-text' }, `No hay objetivos en «${filterLabel}».`),
+      button('Mostrar todos', () => { app.prefs.set('filter', 'all'); app.render(); }, { small: true, dataset: { fk: 'show-all' } }));
   }
-  const cards = visible.map((g) => goalCard(app, g, { showTab }));
+  const cards = visible.map((g) => goalCard(app, g, { compact }));
   if (tile) cards.push(tile);
 
-  return h('section', { class: 'section', 'aria-labelledby': 'goals-heading' },
-    h('div', { class: 'section-head is-solo' }, h('h2', { id: 'goals-heading', class: 'section-title' }, heading)),
+  const headingId = heading ? nextId('goals-heading') : null;
+  return h('section', { class: 'section', 'aria-labelledby': headingId, 'aria-label': heading ? null : label },
+    heading ? h('div', { class: 'section-head is-solo' }, h('h2', { id: headingId, class: 'section-title' }, heading)) : null,
     goals.length ? goalControls(app, goals) : null,
     note,
     cards.length ? h('div', { class: 'goal-grid' }, cards) : null);

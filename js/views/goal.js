@@ -7,7 +7,7 @@ import {
 } from '../labels.js';
 import { computed, statusBadge, fundingLine } from './cards.js';
 import { movementList } from './movements.js';
-import { renderMissing } from './tab.js';
+import { renderMissing } from './goals.js';
 import { openContribution, openRelease, openTransfer, openPayment } from '../forms/money.js';
 import {
   openGoalEdit, openBudgetForm, openMoveTab, openStatusChange, openDeleteGoal, setGoalStatus,
@@ -16,15 +16,19 @@ import { openTaskEdit, openTaskDelete, createTaskInline } from '../forms/tasks.j
 
 export function renderGoalView(app) {
   const goal = app.goal(app.route.id);
-  if (!goal) return renderMissing(app, 'Este objetivo ya no existe', 'Puede que se haya eliminado desde otro dispositivo.');
+  if (!goal) {
+    return renderMissing(app, 'Este objetivo ya no existe', 'Puede que se haya eliminado desde otro dispositivo.',
+      { route: { name: 'goals' }, label: 'Ver los objetivos' });
+  }
   const c = computed(goal);
   const names = app.names();
-  const tab = app.tab(goal.tab_id);
-  const backRoute = tab ? { name: 'tab', id: tab.id } : { name: 'summary' };
+  // «Atrás» vuelve a Objetivos; a la pestaña que se estaba viendo si el objetivo es de ella.
+  const lastTab = app.memory.get('goals-tab');
+  const backRoute = lastTab != null && lastTab === goal.tab_id && app.tab(lastTab) ? { name: 'goals', id: lastTab } : { name: 'goals' };
 
   return h('div', { class: 'view goal-view' },
-    h('a', { class: 'back-link', href: app.href(backRoute) }, icon('chevronLeft'), h('span', null, tab ? tab.name : 'Resumen')),
-    header(app, goal, names, tab),
+    h('a', { class: 'back-link', href: app.href(backRoute) }, icon('chevronLeft'), h('span', null, 'Objetivos')),
+    header(app, goal, names),
     c.ready_to_complete
       ? notice('success',
         h('p', null, h('strong', null, 'Listo para marcar como cumplido. '), 'La meta está cubierta y no quedan tareas pendientes.'),

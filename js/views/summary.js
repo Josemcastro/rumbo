@@ -1,6 +1,6 @@
-// Vista «Resumen»: solo los objetivos, cada uno con su círculo de progreso.
-// Las cifras de dinero viven en «Ahorros»; los objetivos se crean desde
-// «Gestionar» o desde cada pestaña.
+// Vista «Resumen»: un vistazo a los objetivos, cada uno solo con su nombre, su meta y el
+// círculo de progreso. Las cifras de dinero viven en «Ahorros» y los objetivos se crean
+// desde «Objetivos».
 
 import { h, button } from '../ui.js';
 import { goalSection } from './cards.js';
@@ -15,7 +15,14 @@ export function renderSummary(app) {
     h('header', { class: 'view-head view-head-center' },
       h('h1', { class: 'view-title' }, 'Resumen'),
       unnamed
-        ? h('p', { class: 'view-sub' }, button('Poned vuestros nombres', () => openNamesForm(app), { variant: 'plain', small: true, iconName: 'users', extraClass: 'btn-inline', dataset: { fk: 'set-names' } }))
+        ? h('p', { class: 'view-sub' }, button('Poned vuestros nombres', () => openNamesForm(app), { variant: 'plain', small: true, iconName: 'users', dataset: { fk: 'set-names' } }))
         : h('p', { class: 'view-sub' }, `${names.a} y ${names.b}`)),
-    goalSection(app, goals, { showTab: true, allowCreate: false }));
+    goalSection(app, goals, {
+      compact: true,
+      allowCreate: false,
+      empty: {
+        text: 'Cread el primero en «Objetivos», en la barra de abajo: una meta, la pestaña donde va y para quién es.',
+        action: h('a', { class: 'btn btn-secondary btn-small', href: app.href({ name: 'goals' }), dataset: { fk: 'go-goals' } }, 'Ir a Objetivos'),
+      },
+    }));
 }
