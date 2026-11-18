@@ -118,12 +118,26 @@ export function openTabManager(app) {
     }
   });
 
+  // «Nuevo objetivo» vive aquí (y dentro de cada pestaña), no en el Resumen.
+  // goal.js ya importa este módulo: se carga bajo demanda para evitar un ciclo.
+  const newGoalBtn = button('Nuevo objetivo', async () => {
+    const { openGoalCreate } = await import('./goal.js');
+    sheet.close();
+    openGoalCreate(app, { tabId: null });
+  }, { variant: 'primary', iconName: 'plus', extraClass: 'btn-block', dataset: { fk: 'manage-new-goal' } });
+
   const sheet = openSheet({
-    title: 'Gestionar pestañas',
+    title: 'Gestionar',
     content: [
-      h('p', { class: 'sheet-intro' }, 'Resumen y Ahorros son fijas. El resto podéis crearlas, renombrarlas, ordenarlas o eliminarlas.'),
-      list,
-      createForm,
+      h('div', { class: 'manage-block' },
+        h('h3', { class: 'subsection-title' }, 'Objetivos'),
+        h('p', { class: 'sheet-intro' }, 'Cread un objetivo y elegid en qué pestaña aparece.'),
+        newGoalBtn),
+      h('div', { class: 'manage-block' },
+        h('h3', { class: 'subsection-title' }, 'Pestañas'),
+        h('p', { class: 'sheet-intro' }, 'Resumen y Ahorros son fijas. El resto podéis crearlas, renombrarlas, ordenarlas o eliminarlas.'),
+        list,
+        createForm),
     ],
   });
   rebuild();
