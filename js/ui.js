@@ -71,6 +71,18 @@ export function prefersReducedMotion() {
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
+/** Icono de la app (icon.svg en la raíz). Se resuelve desde este módulo para que valga
+ *  igual en index.html que en tests/app-local.html o en https://usuario.github.io/repo/. */
+export const APP_ICON_URL = new URL('../icon.svg', import.meta.url).href;
+
+/** Logo de la app con esquinas de icono. Es decorativo: el nombre «Rumbo» va siempre al lado. */
+export function appLogo(size, extraClass = '') {
+  return h('img', {
+    src: APP_ICON_URL, alt: '', width: size, height: size, decoding: 'async', draggable: 'false',
+    class: ['app-logo', extraClass],
+  });
+}
+
 /** Botón solo con icono y etiqueta accesible. */
 export function iconButton(name, label, onClick, extra = {}) {
   return h('button', {
@@ -304,7 +316,10 @@ export function fillSelect(select, options, value) {
   }
 }
 
-/** Grupo de opciones tipo «segmento» (radios accesibles). */
+/**
+ * Grupo de opciones tipo «segmento» (radios accesibles). Una opción con `disabled` se ve
+ * atenuada y no se puede elegir; su descripción debería explicar el motivo.
+ */
 export function segmented({ legend, name, options, value, onChange, cards = false, fieldName }) {
   const groupName = nextId(name || 'seg');
   const errEl = h('p', { class: 'field-error', hidden: true });
@@ -313,12 +328,13 @@ export function segmented({ legend, name, options, value, onChange, cards = fals
   const wrap = h('div', { class: 'segmented-options' });
   for (const opt of options) {
     const id = nextId('opt');
-    const input = h('input', { type: 'radio', name: groupName, id, value: opt.value, checked: opt.value === value, onChange: () => onChange && onChange(opt.value) });
+    const input = h('input', { type: 'radio', name: groupName, id, value: opt.value, checked: opt.value === value, disabled: !!opt.disabled, onChange: () => onChange && onChange(opt.value) });
     const descEl = opt.description !== undefined ? h('span', { class: 'segment-desc' }, opt.description) : null;
     const label = h('label', { for: id, class: 'segment' },
       h('span', { class: 'segment-title' }, opt.label), descEl);
     const item = h('div', { class: 'segment-item' }, input, label);
     item.setDescription = (text) => { if (descEl) descEl.textContent = text; };
+    item.setDisabled = (disabled) => { input.disabled = !!disabled; };
     item.dataset.value = opt.value;
     wrap.append(item);
   }

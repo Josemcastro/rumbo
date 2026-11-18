@@ -1,12 +1,17 @@
 // Iconos lineales (24×24, trazo 1,5) dibujados con el DOM de SVG.
 // No usan innerHTML, así que cumplen la política de seguridad de contenidos.
+// Cada forma es un trazado («d»), un círculo C(cx, cy, r) o un trazado relleno F(d).
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const C = (cx, cy, r) => ({ c: [cx, cy, r] });
+const F = (d) => ({ d, fill: true });
 
 export const ICONS = {
-  // Diana con una flecha entrando: los anillos se abren por donde entra.
-  logo: ['M13.2 4.79A8.5 8.5 0 1 0 19.21 10.8', 'M12.54 8.77A4.5 4.5 0 1 0 15.23 11.46', C(11, 13, 1), 'M11 13l8.5-8.5', 'M19.5 4.5h3M19.5 4.5v-3'],
+  // Barra de navegación inferior y Ajustes (el logo de la app es la imagen icon.svg).
+  target: [C(12, 12, 8.5), C(12, 12, 5), C(12, 12, 1.5)],
+  gear: ['M10.14 5.51L10.34 3.05A9.1 9.1 0 0 1 13.66 3.05L13.86 5.51A6.75 6.75 0 0 1 15.27 6.1L17.15 4.5A9.1 9.1 0 0 1 19.5 6.85L17.9 8.73A6.75 6.75 0 0 1 18.49 10.14L20.95 10.34A9.1 9.1 0 0 1 20.95 13.66L18.49 13.86A6.75 6.75 0 0 1 17.9 15.27L19.5 17.15A9.1 9.1 0 0 1 17.15 19.5L15.27 17.9A6.75 6.75 0 0 1 13.86 18.49L13.66 20.95A9.1 9.1 0 0 1 10.34 20.95L10.14 18.49A6.75 6.75 0 0 1 8.73 17.9L6.85 19.5A9.1 9.1 0 0 1 4.5 17.15L6.1 15.27A6.75 6.75 0 0 1 5.51 13.86L3.05 13.66A9.1 9.1 0 0 1 3.05 10.34L5.51 10.14A6.75 6.75 0 0 1 6.1 8.73L4.5 6.85A9.1 9.1 0 0 1 6.85 4.5L8.73 6.1A6.75 6.75 0 0 1 10.14 5.51Z', C(12, 12, 2.75)],
+  appearance: [C(12, 12, 8.5), F('M12 3.5a8.5 8.5 0 0 1 0 17z')],
+  phone: ['M8.5 2.5h7a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2z', 'M11 18.5h2'],
   plus: ['M12 5v14M5 12h14'],
   close: ['M6 6l12 12M18 6L6 18'],
   check: ['M5 12.5l4.5 4.5L19 7.5'],
@@ -45,7 +50,8 @@ export const ICONS = {
   card: ['M3 6h18v12H3z', 'M3 10h18', 'M7 15h4'],
   link: ['M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1', 'M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1'],
   home: ['M4 11l8-7 8 7', 'M6 9.5V20h12V9.5'],
-  piggy: ['M5 11a7 6 0 0 1 12.5-3.5L20 7v4l-1.5 1A7 6 0 0 1 15 16.5V19h-2.5v-2h-3v2H7v-3A6 6 0 0 1 5 11z', 'M14.5 10.5h.01'],
+  // Hucha: cuerpo con oreja y hocico (mira a la derecha), ranura, ojo y rabito.
+  piggy: ['M17.5 8.2V5c-1.3 0-2.4.7-3 1.6A9 9 0 0 0 12 6.2C7.6 6.2 4.5 8.6 4.5 12c0 1.9 1 3.5 2.5 4.6V19h2.5v-1.5c.8.2 1.6.3 2.5.3s1.7-.1 2.5-.3V19h2.5v-2.4c.9-.6 1.6-1.4 2-2.3h1.5v-4h-1.3c-.3-.8-.9-1.5-1.7-2.1z', 'M10 9.2h3', 'M16 11h.01', 'M4.5 11.5c-1.1 0-2-.8-2-1.8'],
   cloud: ['M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 11a3.5 3.5 0 0 0 1 7z'],
   cloudOff: ['M7 18h10a4 4 0 0 0 1.6-.33', 'M20.5 14.5A4 4 0 0 0 17.5 10a6 6 0 0 0-8.3-4.6', 'M6.2 11.1A3.5 3.5 0 0 0 7 18', 'M4 4l16 16'],
   database: ['M5 6c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3z', 'M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6', 'M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3'],
@@ -66,9 +72,10 @@ export function icon(name, extraClass = '') {
   svg.setAttribute('focusable', 'false');
   svg.setAttribute('class', `icon${extraClass ? ' ' + extraClass : ''}`);
   for (const shape of ICONS[name] || []) {
-    if (typeof shape === 'string') {
+    if (typeof shape === 'string' || shape.d) {
       const path = document.createElementNS(SVG_NS, 'path');
-      path.setAttribute('d', shape);
+      path.setAttribute('d', typeof shape === 'string' ? shape : shape.d);
+      if (shape.fill) path.setAttribute('fill', 'currentColor');
       svg.append(path);
     } else {
       const circle = document.createElementNS(SVG_NS, 'circle');

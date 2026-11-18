@@ -6,20 +6,21 @@ import { createSync } from './sync.js';
 import { parseHash, buildHash, sameRoute } from './router.js';
 import { h, icon, replaceChildren, initToasts, toast, closeAllSheets } from './ui.js';
 import { memberNames } from './labels.js';
+import { applyTheme, getThemePref } from './theme.js';
 import { renderShell, updateShell, setSyncStatus } from './views/shell.js';
 import {
   renderSetupMissing, renderHome, renderWelcome, renderInvalid, renderLoading, renderLoadError,
 } from './views/start.js';
 import { renderSummary } from './views/summary.js';
 import { renderSavings } from './views/savings.js';
-import { renderTabView } from './views/tab.js';
+import { renderGoalsView } from './views/goals.js';
 import { renderGoalView } from './views/goal.js';
-import { renderSettings } from './views/settings.js';
+import { renderSettings, settingsTitle } from './views/settings.js';
 
 const VIEWS = {
   summary: renderSummary,
+  goals: renderGoalsView,
   savings: renderSavings,
-  tab: renderTabView,
   goal: renderGoalView,
   settings: renderSettings,
 };
@@ -33,6 +34,11 @@ let session = null; // { secret, state, status, sync, shell, refreshing, refresh
 let currentRoute = { name: 'home' };
 const stateListeners = new Set();
 const uiMemory = new Map(); // memoria de la vista (borradores, «mostrar más»…), solo en esta pestaña
+// Enlaces regenerados desde esta pestaña: secreto anterior → secreto actual. El historial del
+// navegador conserva entradas con el anterior (p. ej. #<viejo>/ajustes al volver atrás desde
+// «Enlace del espacio»); al llegar a una se reescribe con el actual en vez de abrir una sesión
+// con un enlace que ya no vale. Solo en memoria: se pierde al recargar la página.
+const replacedSecrets = new Map();
 
 // ---------- Preferencias visuales (localStorage, con try/catch) ----------
 
@@ -236,7 +242,7 @@ const app = {
     }
     stateListeners.clear();
     document.title = 'Rumbo';
-    replaceChildren(root, renderInvalid(app));
+    showScreen(renderInvalid(app));
   },
 
   /**
@@ -262,8 +268,14 @@ const app = {
         throw err;
       }
     }
-    if (s !== session) return;
+    // El secreto anterior ya no vale en ningún sitio (aunque entretanto se haya cambiado de
+    // pantalla): las entradas del historial y el espacio recordado pasan al nuevo.
+    for (const [previous, current] of replacedSecrets) {
+      if (current === oldSecret) replacedSecrets.set(previous, newSecret); // regenerado varias veces
+    }
+    replacedSecrets.set(oldSecret, newSecret);
     if (remembered.get() === oldSecret) remembered.set(newSecret);
+    if (s !== session) return;
     s.secret = newSecret;
     history.replaceState(null, '', buildHash(newSecret, currentRoute));
     s.sync.switchSecret(newSecret, Number.isFinite(res.rev) ? res.rev : (s.state ? s.state.rev + 1 : 1));
@@ -339,7 +351,14 @@ async function loadInitial(s) {
 
 // ---------- Renderizado ----------
 
-const TITLES = { summary: 'Resumen', savings: 'Ahorros', settings: 'Ajustes' };
+const TITLES = { summary: 'Resumen', goals: 'Objetivos', savings: 'Ahorros', settings: 'Ajustes' };
+
+function pageTitle(route) {
+  if (route.name === 'goal') return (app.goal(route.id) || {}).name || 'Objetivo';
+  if (route.name === 'goals' && route.id != null) return `${app.tabName(route.id) || 'Pestaña'} · Objetivos`;
+  if (route.name === 'settings' && route.section) return `${settingsTitle(route.section)} · Ajustes`;
+  return TITLES[route.name];
+}
 
 function renderMain({ routeChanged }) {
   const s = session;
@@ -349,16 +368,23 @@ function renderMain({ routeChanged }) {
     replaceChildren(root, s.shell.root);
     routeChanged = true;
   }
+  // La barra inferior vuelve a «Objetivos» con la última pestaña elegida.
+  if (currentRoute.name === 'goals') uiMemory.set('goals-tab', currentRoute.id ?? null);
   const shell = s.shell;
-  updateShell(app, shell, { routeChanged });
+  updateShell(app, shell);
 
   const view = VIEWS[currentRoute.name] || renderSummary;
   const main = shell.main;
+  // Cambio de ruta dentro de la misma vista (p. ej. otra pestaña en Objetivos): el foco se
+  // queda en el control equivalente en vez de saltar al título.
+  const sameView = s.viewName === currentRoute.name;
+  s.viewName = currentRoute.name;
 
   // Conservar foco, borradores y desplazamiento al repintar por un cambio de datos.
   const active = document.activeElement;
-  const focusKey = !routeChanged && active && main.contains(active) ? active.closest('[data-fk]')?.dataset.fk : null;
-  const selection = focusKey && active && typeof active.selectionStart === 'number'
+  const activeKey = active && main.contains(active) ? active.closest('[data-fk]')?.dataset.fk : null;
+  const focusKey = !routeChanged || sameView ? activeKey : null;
+  const selection = !routeChanged && focusKey && active && typeof active.selectionStart === 'number'
     ? [active.selectionStart, active.selectionEnd] : null;
   const drafts = new Map();
   main.querySelectorAll('[data-persist]').forEach((el) => drafts.set(el.dataset.persist, el.value));
@@ -372,17 +398,20 @@ function renderMain({ routeChanged }) {
     if (el && !el.value) el.value = value;
   }
 
-  let title = TITLES[currentRoute.name];
-  if (currentRoute.name === 'goal') title = (app.goal(currentRoute.id) || {}).name || 'Objetivo';
-  if (currentRoute.name === 'tab') title = app.tabName(currentRoute.id) || 'Pestaña';
+  const title = pageTitle(currentRoute);
   document.title = title ? `${title} · Rumbo` : 'Rumbo';
 
   if (routeChanged) {
     window.scrollTo(0, 0);
-    const heading = main.querySelector('h1');
-    if (heading && s.focusOnRoute) {
-      heading.setAttribute('tabindex', '-1');
-      heading.focus({ preventScroll: true });
+    const kept = focusKey ? main.querySelector(`[data-fk="${CSS.escape(focusKey)}"]`) : null;
+    if (kept && s.focusOnRoute) {
+      kept.focus({ preventScroll: true });
+    } else {
+      const heading = main.querySelector('h1');
+      if (heading && s.focusOnRoute) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+      }
     }
     s.focusOnRoute = true;
   } else {
@@ -401,8 +430,16 @@ function renderMain({ routeChanged }) {
 
 // ---------- Ruteo ----------
 
+/** Pantalla sin espacio cargado (inicio, enlace nuevo o no válido), desde arriba. */
+function showScreen(node) {
+  replaceChildren(root, node);
+  window.scrollTo(0, 0);
+}
+
 function onHashChange() {
-  const { secret, route } = parseHash(location.hash);
+  const { secret: hashSecret, route, legacy } = parseHash(location.hash);
+  // Entrada con un enlace que esta pestaña ha regenerado: se sigue con el actual.
+  const secret = replacedSecrets.get(hashSecret) || hashSecret;
   if (!secret) {
     const saved = remembered.get();
     if (saved) {
@@ -414,7 +451,7 @@ function onHashChange() {
     closeAllSheets();
     currentRoute = { name: 'home' };
     document.title = 'Rumbo';
-    replaceChildren(root, renderHome(app));
+    showScreen(renderHome(app));
     return;
   }
   if (!isValidSecret(secret)) {
@@ -422,15 +459,18 @@ function onHashChange() {
     closeAllSheets();
     currentRoute = { name: 'invalid' };
     document.title = 'Rumbo';
-    replaceChildren(root, renderInvalid(app));
+    showScreen(renderInvalid(app));
     return;
   }
+  // Enlaces guardados con una ruta antigua (#<secreto>/tab/<id>) o con un secreto ya
+  // regenerado (p. ej. al volver atrás tras «Regenerar enlace»): se reescribe la dirección.
+  if (legacy || secret !== hashSecret) history.replaceState(null, '', buildHash(secret, route));
   if (route.name === 'welcome') {
     if (session) { session.sync.stop(); session = null; }
     closeAllSheets();
     currentRoute = route;
     document.title = 'Vuestro enlace · Rumbo';
-    replaceChildren(root, renderWelcome(app, secret));
+    showScreen(renderWelcome(app, secret));
     return;
   }
   const changed = !sameRoute(route, currentRoute);
@@ -449,6 +489,8 @@ function onHashChange() {
 // ---------- Arranque ----------
 
 async function boot() {
+  // js/theme-boot.js ya lo aplicó antes de pintar; se repite por si la página se sirvió sin él.
+  applyTheme(getThemePref());
   initToasts();
   try {
     if (backendKind === 'pglite') {

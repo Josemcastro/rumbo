@@ -61,7 +61,7 @@ export function attributionOptions(names) {
 export function kindLabel(m) {
   switch (m.kind) {
     case 'deposit': return flag(m.is_initial) ? 'Ahorros iniciales' : 'Ahorro';
-    case 'deposit_to_goal': return 'Ahorro asignado';
+    case 'deposit_to_goal': return 'Aportación';
     case 'allocate': return 'Asignación';
     case 'release': return 'Liberación';
     case 'transfer': return 'Movimiento entre objetivos';
