@@ -140,6 +140,9 @@ strong { font-weight: 600; }
 .icon-btn[aria-current="page"] { color: var(--accent); }
 
 .button-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+/* Dos botones emparejados: misma anchura. */
+.button-row-even { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.button-row-even .btn { width: 100%; padding-left: 12px; padding-right: 12px; }
 
 /* ---------- Pantallas sin espacio (inicio, carga, errores) ---------- */
 
@@ -275,11 +278,15 @@ strong { font-weight: 600; }
 .view { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 .view-head { display: flex; flex-direction: column; gap: 6px; }
 .view-head-row { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.view-head-center { align-items: center; text-align: center; }
 .view-title { font-size: 2rem; line-height: 1.12; font-weight: 700; letter-spacing: -0.025em; overflow-wrap: anywhere; outline: none; }
 .view-sub { color: var(--muted); font-size: 1.0625rem; overflow-wrap: anywhere; }
 
 .section { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .section-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.section-head.is-solo { justify-content: center; text-align: center; }
+/* Títulos de sección fuera de tarjetas: centrados, como los de cada vista. */
+.section:not(.card) > .section-title { text-align: center; }
 .section-title { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
 .subsection-title { font-size: 1rem; font-weight: 600; }
 
@@ -287,7 +294,7 @@ strong { font-weight: 600; }
 .card-pad { padding: 18px; }
 
 .stats { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.stat { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-l); padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; }
+.stat { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-l); padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; text-align: center; }
 .stat-label { color: var(--muted); font-size: 0.875rem; font-weight: 500; }
 .stat-value { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin-top: 4px; overflow-wrap: anywhere; }
 .stat-hint { color: var(--muted); font-size: 0.8125rem; margin-top: 4px; }
@@ -300,39 +307,65 @@ strong { font-weight: 600; }
 .progress-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .progress-card-percent { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.list-controls { display: flex; flex-wrap: wrap; gap: 10px 16px; }
-.control { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.control label { color: var(--muted); font-size: 0.875rem; white-space: nowrap; }
+/* «Mostrar» y «Ordenar por»: dos columnas iguales, una al lado de la otra. */
+.list-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.control { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.control label { color: var(--muted); font-size: 0.8125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 2px; }
+.control .select-compact { width: 100%; }
 
 /* ---------- Tarjetas de objetivo ---------- */
 
-.goal-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+/* Todas las tarjetas miden lo mismo (la más alta marca la altura): composición simétrica. */
+.goal-grid { display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 12px; }
+/* Tarjeta: contenido a la izquierda y círculo de progreso a la derecha, centrado en vertical. */
 .goal-card {
-  position: relative; display: flex; flex-direction: column; gap: 8px;
-  padding: 16px 18px; min-width: 0;
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px;
+  padding: 18px 20px; min-width: 0; min-height: 128px;
   background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-l);
   box-shadow: var(--shadow);
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 .goal-card:hover { border-color: var(--border); }
+.goal-card:active { transform: scale(0.99); }
 .goal-card:focus-within { border-color: var(--border); }
 .goal-card.is-archived, .goal-card.is-done { background: color-mix(in srgb, var(--surface) 70%, var(--bg)); }
-.goal-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.goal-card-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .goal-card-title { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
 .goal-card-title a { color: var(--text); }
 .goal-card-title a:hover { text-decoration: none; }
 .stretched-link::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-l); }
 .stretched-link:focus-visible { outline: none; }
 .stretched-link:focus-visible::after { outline: 3px solid var(--focus); outline-offset: 2px; }
-.goal-card-meta { color: var(--muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
-.goal-card-amounts { font-size: 0.9375rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.goal-card-amounts strong { color: var(--text); font-size: 1.125rem; }
+.goal-card-meta { color: var(--muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; overflow-wrap: anywhere; }
+.goal-card-badge { display: flex; margin: 2px 0; }
+.goal-card-amounts { font-size: 0.875rem; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.goal-card-amounts strong { color: var(--text); font-weight: 600; font-size: 0.9375rem; }
+.goal-card .funding { font-size: 0.8125rem; }
+.goal-card-foot { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 0.8125rem; margin-top: 2px; }
+.goal-card-foot span { display: inline-flex; align-items: center; gap: 4px; }
+.goal-card-foot .icon { width: 15px; height: 15px; }
+/* Fila de porcentaje y estado (vista de detalle). */
 .goal-card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.875rem; }
 .goal-card-percent { font-weight: 600; font-variant-numeric: tabular-nums; }
-.goal-card-foot { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 0.8125rem; }
-.goal-card-foot span { display: inline-flex; align-items: center; gap: 4px; }
-.goal-card-foot .icon { width: 16px; height: 16px; }
-.goal-card-actions { display: flex; margin-top: 4px; }
+
+/* Tarjeta «+ Nuevo objetivo»: mismo tamaño que las demás, borde discontinuo. */
+.goal-card.goal-add {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: transparent; border: 1.5px dashed var(--border); box-shadow: none;
+  color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-align: center;
+}
+.goal-card.goal-add .icon { width: 28px; height: 28px; }
+.goal-card.goal-add:hover { background: var(--accent-soft); border-color: var(--accent); }
+.goal-card.goal-add:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Círculo de progreso económico (se llena según el porcentaje). */
+.ring { position: relative; width: 72px; height: 72px; flex: none; display: grid; place-items: center; }
+.ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ring-track { stroke: var(--border-soft); }
+.ring-fill { stroke: var(--accent); }
+.ring.is-funded .ring-fill { stroke: var(--success); }
+.ring-text { position: relative; font-size: 0.875rem; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ring.is-funded .ring-text { color: var(--success); }
 .raise { position: relative; z-index: 1; }
 
 .funding { display: inline-flex; align-items: center; gap: 4px; font-size: 0.875rem; color: var(--muted); font-weight: 500; }
@@ -354,6 +387,7 @@ strong { font-weight: 600; }
 
 .empty { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 22px 18px; border: 1px dashed var(--border); border-radius: var(--radius-l); }
 .empty-title { font-weight: 600; }
+.empty-center { align-items: center; text-align: center; border: 0; padding: 8px 12px; }
 .empty-text { color: var(--muted); }
 .empty-page { align-items: center; text-align: center; border: 0; padding: 48px 0; gap: 12px; }
 .empty-page .icon { width: 32px; height: 32px; color: var(--muted); }
@@ -580,6 +614,9 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .manage-name { font-weight: 500; overflow-wrap: anywhere; }
 .manage-actions { display: flex; flex: none; }
 .inline-form { display: flex; flex-direction: column; gap: 10px; }
+.manage-block { display: flex; flex-direction: column; gap: 8px; }
+.manage-block + .manage-block { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-soft); }
+.manage-block .manage-list { margin: 4px 0 8px; }
 .inline-form .btn { align-self: flex-start; }
 .new-tab-row { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 
@@ -634,9 +671,6 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   .view-title { font-size: 2.25rem; }
 }
 
-@media (min-width: 900px) {
-  .goal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
 
 @media (max-width: 359px) {
   .sync-text { display: none; }
