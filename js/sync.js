@@ -29,8 +29,12 @@ export function createSync({ api, getRev, onNewRev, onUnauthorized, onStatus }) 
 
   function emitStatus() {
     let status;
-    if (!networkOk || navigator.onLine === false) status = 'offline';
+    // Las pruebas reales de conexión (la última consulta funcionó o el canal en
+    // tiempo real está unido) mandan sobre navigator.onLine, que algunos
+    // navegadores informan mal.
+    if (!networkOk) status = 'offline';
     else if (channelState === 'joined') status = 'live';
+    else if (navigator.onLine === false) status = 'offline';
     else status = 'reconnecting';
     if (status !== lastStatus) {
       lastStatus = status;
