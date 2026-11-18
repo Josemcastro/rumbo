@@ -9,7 +9,7 @@ export function renderTabView(app) {
   if (!tab) return renderMissing(app, 'Esta pestaña ya no existe', 'Puede que se haya eliminado desde otro dispositivo.');
   const goals = app.state.goals.filter((g) => g.tab_id === tab.id);
   return h('div', { class: 'view' },
-    h('header', { class: 'view-head view-head-row' },
+    h('header', { class: 'view-head view-head-center' },
       h('h1', { class: 'view-title' }, tab.name),
       button('Renombrar', () => openRenameTab(app, tab.id), { variant: 'plain', small: true, iconName: 'pencil', dataset: { fk: 'rename-tab' } })),
     goalSection(app, goals, { tabId: tab.id }));

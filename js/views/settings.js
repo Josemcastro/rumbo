@@ -12,7 +12,7 @@ export function renderSettings(app) {
   const isDemo = flag(space.is_demo);
 
   return h('div', { class: 'view' },
-    h('header', { class: 'view-head' }, h('h1', { class: 'view-title' }, 'Ajustes')),
+    h('header', { class: 'view-head view-head-center' }, h('h1', { class: 'view-title' }, 'Ajustes')),
 
     isDemo ? notice('info',
       h('p', null, h('strong', null, 'Espacio de demostración. '), 'Todos los datos son ficticios y el espacio se borra automáticamente pasadas 24 horas. Podéis probar lo que queráis.'),

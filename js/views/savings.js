@@ -25,15 +25,15 @@ export function renderSavings(app) {
     : h('p', { class: 'muted' }, 'Ningún objetivo tiene dinero reservado ahora mismo.');
 
   return h('div', { class: 'view' },
-    h('header', { class: 'view-head' }, h('h1', { class: 'view-title' }, 'Ahorros')),
+    h('header', { class: 'view-head view-head-center' }, h('h1', { class: 'view-title' }, 'Ahorros')),
     h('section', { class: 'section', 'aria-label': 'Dinero' },
       h('div', { class: 'stats' },
         stat('Ahorros totales', savings.total_cents, { hint: 'Todo lo que tenéis ahorrado.' }),
         stat('Asignado a objetivos', savings.allocated_cents, { hint: 'Reservado para objetivos (de cualquier estado).' }),
         stat('Disponible para asignar', savings.available_cents, { hint: 'Libre para reservar o gastar.', tone: 'accent' })),
-      h('div', { class: 'button-row' },
-        button('Añadir ahorro', () => openDeposit(app, { initial: false }), { variant: 'primary', iconName: 'plus', dataset: { fk: 'add-saving' } }),
-        button('Registrar salida', () => openWithdrawal(app), { iconName: 'arrowOut', dataset: { fk: 'withdrawal' } }))),
+      h('div', { class: 'button-row button-row-even' },
+        button('Añadir ahorro', () => openDeposit(app, { initial: false }), { variant: 'primary', dataset: { fk: 'add-saving' } }),
+        button('Registrar salida', () => openWithdrawal(app), { dataset: { fk: 'withdrawal' } }))),
     !movements.length
       ? notice('info',
         h('p', null, '¿Ya tenéis algo ahorrado? Registradlo como ahorros iniciales para empezar desde vuestra situación real.'),

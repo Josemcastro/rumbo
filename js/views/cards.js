@@ -1,11 +1,10 @@
 // Tarjetas de objetivo, filtro por estado, orden y cifras destacadas.
 
-import { h, icon, button, progressBar, selectInput, nextId } from '../ui.js';
+import { h, icon, button, selectInput, nextId } from '../ui.js';
 import { formatCents, formatPercent, formatDate, todayISO } from '../format.js';
 import {
   STATUS_LABELS, STATUS_ICONS, PRIORITY_ORDER, FILTER_OPTIONS, SORT_OPTIONS,
 } from '../labels.js';
-import { openContribution } from '../forms/money.js';
 import { openGoalCreate } from '../forms/goal.js';
 
 export function computed(goal) {
@@ -62,6 +61,51 @@ export function goalControls(app, goals) {
     h('div', { class: 'control' }, h('label', { for: sortId }, 'Ordenar por'), sortSelect));
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const RING_SIZE = 72;
+const RING_STROKE = 6;
+const RING_R = (RING_SIZE - RING_STROKE) / 2;
+const RING_LEN = 2 * Math.PI * RING_R;
+
+/**
+ * Círculo de progreso económico con el porcentaje dentro. Se llena según el
+ * porcentaje (limitado al 100 %). Usa atributos SVG, no estilos en línea (CSP).
+ */
+export function progressRing(goal) {
+  const c = computed(goal);
+  const pct = Math.max(0, Math.min(100, Number(c.percent_capped) || 0));
+  const funded = c.funding_status === 'funded';
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${RING_SIZE} ${RING_SIZE}`);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('class', 'ring-svg');
+  const mk = (cls) => {
+    const el = document.createElementNS(SVG_NS, 'circle');
+    el.setAttribute('cx', String(RING_SIZE / 2));
+    el.setAttribute('cy', String(RING_SIZE / 2));
+    el.setAttribute('r', String(RING_R));
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke-width', String(RING_STROKE));
+    el.setAttribute('class', cls);
+    return el;
+  };
+  const track = mk('ring-track');
+  const fill = mk('ring-fill');
+  fill.setAttribute('stroke-linecap', 'round');
+  fill.setAttribute('transform', `rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`);
+  const len = (RING_LEN * pct) / 100;
+  fill.setAttribute('stroke-dasharray', `${len.toFixed(2)} ${RING_LEN.toFixed(2)}`);
+  if (pct <= 0) fill.setAttribute('stroke-opacity', '0');
+  svg.append(track, fill);
+  const text = formatPercent(pct);
+  return h('div', {
+    class: ['ring', funded && 'is-funded'],
+    role: 'img',
+    'aria-label': `Progreso económico: ${formatPercent(c.percent)}`,
+  }, svg, h('span', { class: 'ring-text', 'aria-hidden': 'true' }, text));
+}
+
 export function goalCard(app, goal, { showTab = false } = {}) {
   const c = computed(goal);
   const funding = fundingLine(goal);
@@ -75,51 +119,55 @@ export function goalCard(app, goal, { showTab = false } = {}) {
     const late = goal.desired_date < todayISO() && (goal.status === 'active' || goal.status === 'paused') && c.funding_status !== 'funded';
     foot.push(h('span', { class: late ? 'is-late' : null }, icon('calendar'), formatDate(goal.desired_date)));
   }
-  const canContribute = goal.status === 'active' || goal.status === 'paused';
 
   return h('article', { class: ['goal-card', `is-${goal.status}`], 'aria-labelledby': titleId },
-    h('div', { class: 'goal-card-head' },
+    h('div', { class: 'goal-card-body' },
+      tabName ? h('p', { class: 'goal-card-meta' }, tabName) : null,
       h('h3', { class: 'goal-card-title', id: titleId },
         h('a', { href: app.href({ name: 'goal', id: goal.id }), class: 'stretched-link', dataset: { fk: `goal-${goal.id}` } }, goal.name)),
-      goal.status !== 'active' ? statusBadge(goal.status) : null),
-    tabName ? h('p', { class: 'goal-card-meta' }, tabName) : null,
-    h('p', { class: 'goal-card-amounts' }, h('strong', null, formatCents(covered)), ` de ${formatCents(target)}`),
-    progressBar(c.percent_capped, { label: `Progreso de ${goal.name}`, valueText: `${formatPercent(c.percent)}, ${formatCents(covered)} de ${formatCents(target)}` }),
-    h('div', { class: 'goal-card-row' },
-      h('span', { class: 'goal-card-percent' }, formatPercent(c.percent)),
-      h('span', { class: ['funding', `funding-${funding.tone}`] }, icon(funding.iconName), funding.text)),
-    foot.length ? h('p', { class: 'goal-card-foot' }, foot) : null,
-    canContribute
-      ? h('div', { class: 'goal-card-actions' },
-        button('Añadir aportación', () => openContribution(app, goal.id), { iconName: 'plus', small: true, extraClass: 'raise', dataset: { fk: `contrib-${goal.id}` } }))
-      : null);
+      goal.status !== 'active' ? h('div', { class: 'goal-card-badge' }, statusBadge(goal.status)) : null,
+      h('p', { class: 'goal-card-amounts' }, h('strong', null, formatCents(covered)), ` de ${formatCents(target)}`),
+      h('p', { class: ['funding', `funding-${funding.tone}`] }, icon(funding.iconName), funding.text),
+      foot.length ? h('p', { class: 'goal-card-foot' }, foot) : null),
+    progressRing(goal));
 }
 
-/** Lista de tarjetas con controles, «Nuevo objetivo» y estado vacío. */
-export function goalSection(app, goals, { showTab = false, tabId = null, heading = 'Objetivos' } = {}) {
+/** Tarjeta discontinua «+ Nuevo objetivo», del mismo tamaño que las demás. */
+function addGoalTile(app, tabId) {
+  return h('button', {
+    type: 'button', class: 'goal-card goal-add', dataset: { fk: 'new-goal' },
+    onclick: () => openGoalCreate(app, { tabId }),
+  }, icon('plus'), h('span', null, 'Nuevo objetivo'));
+}
+
+/** Lista de tarjetas con controles, «Nuevo objetivo» (opcional) y estado vacío. */
+export function goalSection(app, goals, { showTab = false, tabId = null, heading = 'Objetivos', allowCreate = true } = {}) {
   const filter = app.prefs.get('filter', 'active');
   const sort = app.prefs.get('sort', 'priority');
   const visible = sortGoals(filterGoals(goals, filter), sort);
-  const newBtn = button('Nuevo objetivo', () => openGoalCreate(app, { tabId }), { variant: 'primary', iconName: 'plus', dataset: { fk: 'new-goal' } });
+  const tile = allowCreate ? addGoalTile(app, tabId) : null;
 
-  let body;
+  let note = null;
   if (!goals.length) {
-    body = h('div', { class: 'empty' },
+    note = h('div', { class: 'empty empty-center' },
       h('p', { class: 'empty-title' }, tabId ? 'Aún no hay objetivos en esta pestaña' : 'Aún no tenéis objetivos'),
-      h('p', { class: 'empty-text' }, 'Un objetivo es algo para lo que queréis ahorrar: la entrada de un piso, un viaje, la boda… Podéis añadirle una meta, un desglose y los pasos que faltan.'));
+      h('p', { class: 'empty-text' }, allowCreate
+        ? 'Un objetivo es algo para lo que queréis ahorrar: la entrada de un piso, un viaje, la boda… Podéis añadirle una meta, un desglose y los pasos que faltan.'
+        : 'Cread el primero desde «Gestionar», en la barra de pestañas, o desde dentro de cualquier pestaña.'));
   } else if (!visible.length) {
     const label = (FILTER_OPTIONS.find((o) => o.value === filter) || {}).label || '';
-    body = h('div', { class: 'empty' },
+    note = h('div', { class: 'empty empty-center' },
       h('p', { class: 'empty-text' }, `No hay objetivos en «${label}».`),
       button('Mostrar todos', () => { app.prefs.set('filter', 'all'); app.render(); }, { small: true }));
-  } else {
-    body = h('div', { class: 'goal-grid' }, visible.map((g) => goalCard(app, g, { showTab })));
   }
+  const cards = visible.map((g) => goalCard(app, g, { showTab }));
+  if (tile) cards.push(tile);
 
   return h('section', { class: 'section', 'aria-labelledby': 'goals-heading' },
-    h('div', { class: 'section-head' }, h('h2', { id: 'goals-heading', class: 'section-title' }, heading), newBtn),
+    h('div', { class: 'section-head is-solo' }, h('h2', { id: 'goals-heading', class: 'section-title' }, heading)),
     goals.length ? goalControls(app, goals) : null,
-    body);
+    note,
+    cards.length ? h('div', { class: 'goal-grid' }, cards) : null);
 }
 
 /** Cifra destacada (Ahorros totales, Disponible…). */
