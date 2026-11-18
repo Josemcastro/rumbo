@@ -1,7 +1,8 @@
-// Gestión de pestañas: crear, renombrar, reordenar (subir/bajar) y eliminar.
+// Gestión de pestañas (Ajustes → Pestañas de objetivos): crear, renombrar, reordenar
+// (subir/bajar) y eliminar.
 
 import {
-  h, iconButton, button, openSheet, formSheet, field, textInput, selectInput,
+  h, iconButton, button, formSheet, field, textInput, selectInput,
   setFieldError, clearFieldErrors, notice, conflictFieldNames,
 } from '../ui.js';
 import { newOpId } from '../api.js';
@@ -34,115 +35,117 @@ export async function createTab(app, name, opId) {
   return found ? found.id : null;
 }
 
-export function openTabManager(app) {
-  let busy = false;
-  let createOp = newOpId();
-  // Nombre enviado con `createOp` tras un fallo de red: el op_id solo se reutiliza con el mismo nombre.
-  let retryName = null;
-  const list = h('ul', { class: 'manage-list' });
-  const nameInput = textInput({ maxlength: TAB_NAME_MAX, placeholder: 'Por ejemplo: Mascotas', dataset: { fk: 'new-tab-name' } });
-  const addBtn = button('Añadir', null, { variant: 'primary', type: 'submit' });
-  const createForm = h('form', { class: 'inline-form', novalidate: true },
+// La página se vuelve a pintar con cada cambio de datos (también de otro dispositivo), así
+// que lo que está en curso se guarda en app.memory: si hay un envío pendiente, el op_id
+// que se reutiliza al reintentar un fallo de red (solo con el mismo nombre) y el último
+// error ({ name, message }), que solo vale mientras el campo conserva ese nombre.
+const MEM_BUSY = 'tabs-busy';
+const MEM_OP = 'tabs-create-op';
+const MEM_ERROR = 'tabs-create-error';
+
+/** Campo «Nueva pestaña» que hay ahora en pantalla, o null. */
+const currentNameInput = () => document.querySelector('[data-tab-create] input');
+
+/** Contenido de Ajustes → Pestañas de objetivos: lista con sus acciones y alta de pestañas. */
+export function tabManager(app) {
+  const busy = !!app.memory.get(MEM_BUSY);
+  const tabs = app.sortedTabs();
+
+  const list = h('ul', { class: 'manage-list' }, tabs.map((tab, i) => h('li', { class: 'manage-item' },
+    h('div', { class: 'manage-main' },
+      h('span', { class: 'manage-name' }, tab.name),
+      h('span', { class: 'muted small' }, plural(tab.goal_count || 0, 'objetivo', 'objetivos'))),
+    h('div', { class: 'manage-actions' },
+      iconButton('arrowUp', `Subir «${tab.name}»`, () => moveTab(app, tabs, i, -1), { disabled: busy || i === 0, dataset: { fk: `up-${tab.id}` } }),
+      iconButton('arrowDown', `Bajar «${tab.name}»`, () => moveTab(app, tabs, i, 1), { disabled: busy || i === tabs.length - 1, dataset: { fk: `down-${tab.id}` } }),
+      iconButton('pencil', `Renombrar «${tab.name}»`, () => openRenameTab(app, tab.id), { disabled: busy, dataset: { fk: `ren-${tab.id}` } }),
+      iconButton('trash', `Eliminar «${tab.name}»`, () => openDeleteTab(app, tab.id), { disabled: busy, dataset: { fk: `del-${tab.id}` } })))));
+  if (!tabs.length) list.append(h('li', { class: 'manage-empty muted' }, 'Aún no hay pestañas. Cread la primera aquí abajo.'));
+
+  const nameInput = textInput({
+    maxlength: TAB_NAME_MAX, placeholder: 'Por ejemplo: Mascotas', readOnly: busy,
+    dataset: { fk: 'new-tab-name', persist: 'new-tab-name' },
+  });
+  const form = h('form', { class: 'manage-create', novalidate: true, dataset: { tabCreate: '' } },
     field({ label: 'Nueva pestaña', control: nameInput, name: 'name' }),
-    addBtn);
-
-  function rebuild() {
-    if (!app.state) return;
-    const active = document.activeElement;
-    const fk = active && list.contains(active) ? active.dataset.fk : null;
-    const tabs = app.sortedTabs();
-    list.replaceChildren(...tabs.map((tab, i) => h('li', { class: 'manage-item' },
-      h('div', { class: 'manage-main' },
-        h('span', { class: 'manage-name' }, tab.name),
-        h('span', { class: 'muted small' }, plural(tab.goal_count || 0, 'objetivo', 'objetivos'))),
-      h('div', { class: 'manage-actions' },
-        iconButton('arrowUp', `Subir «${tab.name}»`, () => move(tabs, i, -1), { disabled: busy || i === 0, dataset: { fk: `up-${tab.id}` } }),
-        iconButton('arrowDown', `Bajar «${tab.name}»`, () => move(tabs, i, 1), { disabled: busy || i === tabs.length - 1, dataset: { fk: `down-${tab.id}` } }),
-        iconButton('pencil', `Renombrar «${tab.name}»`, () => openRenameTab(app, tab.id), { disabled: busy, dataset: { fk: `ren-${tab.id}` } }),
-        iconButton('trash', `Eliminar «${tab.name}»`, () => openDeleteTab(app, tab.id), { disabled: busy, dataset: { fk: `del-${tab.id}` } })))));
-    if (!tabs.length) list.append(h('li', { class: 'muted' }, 'No hay pestañas personalizadas.'));
-    if (fk) {
-      let el = list.querySelector(`[data-fk="${CSS.escape(fk)}"]`);
-      if (el && el.disabled) el = list.querySelector('button:not([disabled])');
-      if (el) el.focus();
-    }
-  }
-
-  async function move(tabs, index, dir) {
-    if (busy) return;
-    const order = tabs.map((t) => t.id);
-    const j = index + dir;
-    [order[index], order[j]] = [order[j], order[index]];
-    busy = true;
-    rebuild();
-    await app.run('reorder_tabs', { order }, { success: null });
-    busy = false;
-    rebuild();
-  }
-
-  createForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (busy) return;
-    clearFieldErrors(createForm);
-    const problem = tabNameError(app, nameInput.value);
-    if (problem) { setFieldError(createForm, 'name', problem); nameInput.focus(); return; }
-    const sentName = nameInput.value.trim();
-    if (retryName !== null && retryName !== sentName) { createOp = newOpId(); retryName = null; }
-    busy = true;
-    addBtn.disabled = true;
-    nameInput.readOnly = true;
-    rebuild();
-    try {
-      await createTab(app, nameInput.value, createOp);
-      createOp = newOpId();
-      retryName = null;
-      nameInput.value = '';
-      app.toast('Pestaña creada');
-    } catch (err) {
-      if (err && err.code === 'validation' && err.fields) {
-        createOp = newOpId();
-        setFieldError(createForm, 'name', err.fields.name || err.message);
-      } else if (err && err.code === 'unauthorized') {
-        app.invalidate();
-        return;
-      } else {
-        if (err && err.retryable) retryName = sentName; else { createOp = newOpId(); retryName = null; }
-        setFieldError(createForm, 'name', err && err.message ? err.message : 'No se ha podido crear la pestaña.');
-      }
-    } finally {
-      busy = false;
-      addBtn.disabled = false;
-      nameInput.readOnly = false;
-      rebuild();
-      nameInput.focus();
-    }
+    button('Añadir pestaña', null, { variant: 'primary', type: 'submit', iconName: 'plus', disabled: busy, extraClass: 'btn-block', dataset: { fk: 'new-tab-add' } }));
+  // Al repintar esta misma página, app.js devuelve al campo lo escrito; al volver a ella desde
+  // otra, el campo sale vacío. El error se muestra solo si el campo (el que aún está en
+  // pantalla, si lo hay) sigue con el nombre al que se refiere; si no, se olvida.
+  const error = app.memory.get(MEM_ERROR);
+  const shown = currentNameInput();
+  if (error && shown && shown.value.trim() === error.name) setFieldError(form, 'name', error.message);
+  else app.memory.delete(MEM_ERROR);
+  nameInput.addEventListener('input', () => {
+    if (!app.memory.get(MEM_ERROR)) return;
+    app.memory.delete(MEM_ERROR);
+    clearFieldErrors(form);
   });
+  form.addEventListener('submit', (e) => { e.preventDefault(); createFromPage(app); });
 
-  // «Nuevo objetivo» vive aquí (y dentro de cada pestaña), no en el Resumen.
-  // goal.js ya importa este módulo: se carga bajo demanda para evitar un ciclo.
-  const newGoalBtn = button('Nuevo objetivo', async () => {
-    const { openGoalCreate } = await import('./goal.js');
-    sheet.close();
-    openGoalCreate(app, { tabId: null });
-  }, { variant: 'primary', iconName: 'plus', extraClass: 'btn-block', dataset: { fk: 'manage-new-goal' } });
+  return h('div', { class: 'manage' }, list, form);
+}
 
-  const sheet = openSheet({
-    title: 'Gestionar',
-    content: [
-      h('div', { class: 'manage-block' },
-        h('h3', { class: 'subsection-title' }, 'Objetivos'),
-        h('p', { class: 'sheet-intro' }, 'Cread un objetivo y elegid en qué pestaña aparece.'),
-        newGoalBtn),
-      h('div', { class: 'manage-block' },
-        h('h3', { class: 'subsection-title' }, 'Pestañas'),
-        h('p', { class: 'sheet-intro' }, 'Resumen y Ahorros son fijas. El resto podéis crearlas, renombrarlas, ordenarlas o eliminarlas.'),
-        list,
-        createForm),
-    ],
-  });
-  rebuild();
-  const off = app.onState(rebuild);
-  sheet.onClose(off);
+async function moveTab(app, tabs, index, dir) {
+  if (app.memory.get(MEM_BUSY)) return;
+  const order = tabs.map((t) => t.id);
+  const j = index + dir;
+  [order[index], order[j]] = [order[j], order[index]];
+  const movedId = order[j];
+  app.memory.set(MEM_BUSY, true);
+  app.render();
+  await app.run('reorder_tabs', { order }, { success: null });
+  app.memory.delete(MEM_BUSY);
+  app.render();
+  // El foco vuelve a la flecha de la pestaña movida (o a la otra, si esa ya no se puede usar).
+  const arrow = (d) => document.querySelector(`[data-fk="${d < 0 ? 'up' : 'down'}-${movedId}"]`);
+  const target = [arrow(dir), arrow(-dir)].find((el) => el && !el.disabled);
+  if (target) target.focus();
+}
+
+async function createFromPage(app) {
+  if (app.memory.get(MEM_BUSY)) return;
+  const input = currentNameInput();
+  if (!input) return;
+  const name = input.value.trim();
+  app.memory.delete(MEM_ERROR);
+  const problem = tabNameError(app, name);
+  if (problem) {
+    app.memory.set(MEM_ERROR, { name, message: problem });
+    app.render();
+    currentNameInput()?.focus();
+    return;
+  }
+  const pending = app.memory.get(MEM_OP);
+  const opId = pending && pending.name === name ? pending.opId : newOpId();
+  app.memory.set(MEM_OP, { opId, name });
+  app.memory.set(MEM_BUSY, true);
+  app.render();
+  let created = false;
+  try {
+    await createTab(app, name, opId);
+    created = true;
+    app.memory.delete(MEM_OP);
+  } catch (err) {
+    if (err && err.code === 'unauthorized') { app.memory.delete(MEM_BUSY); app.invalidate(); return; }
+    if (!(err && err.retryable)) app.memory.delete(MEM_OP);
+    const detail = err && err.fields && err.fields.name ? err.fields.name : err && err.message;
+    // Si entretanto se ha salido de la página, el campo ya no muestra ese nombre: se avisa aparte.
+    if (currentNameInput()?.value.trim() === name) {
+      app.memory.set(MEM_ERROR, { name, message: detail || 'No se ha podido crear la pestaña.' });
+    } else {
+      app.toast(`No se ha podido crear la pestaña «${name}». ${detail || ''}`.trim(), { type: 'error' });
+    }
+  } finally {
+    app.memory.delete(MEM_BUSY);
+  }
+  if (created) {
+    const el = currentNameInput();
+    if (el) el.value = '';
+    app.toast('Pestaña creada');
+  }
+  app.render();
+  currentNameInput()?.focus();
 }
 
 export function openRenameTab(app, tabId) {
@@ -213,9 +216,10 @@ export function openDeleteTab(app, tabId) {
         if (!select.value) { ctx.fieldError('move_to_tab_id', 'Elige la pestaña a la que mover los objetivos.'); return false; }
         payload.move_to_tab_id = Number(select.value);
       }
-      const viewing = app.route.name === 'tab' && app.route.id === tabId;
+      const viewing = app.route.name === 'goals' && app.route.id === tabId;
       await app.mutate('delete_tab', payload, ctx.opId);
-      if (viewing) app.navigate(payload.move_to_tab_id ? { name: 'tab', id: payload.move_to_tab_id } : { name: 'summary' }, { replace: true });
+      if (app.memory.get('goals-tab') === tabId) app.memory.delete('goals-tab');
+      if (viewing) app.navigate(payload.move_to_tab_id ? { name: 'goals', id: payload.move_to_tab_id } : { name: 'goals' }, { replace: true });
       return true;
     },
     onError(err, ctx) {

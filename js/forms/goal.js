@@ -615,7 +615,10 @@ export function openDeleteGoal(app, goalId) {
       const tabId = goal.tab_id;
       const viewing = app.route.name === 'goal' && app.route.id === goalId;
       await app.mutate('delete_goal', { id: goalId }, ctx.opId);
-      if (viewing) app.navigate(app.tab(tabId) ? { name: 'tab', id: tabId } : { name: 'summary' }, { replace: true });
+      if (viewing) {
+        const lastTab = app.memory.get('goals-tab');
+        app.navigate(lastTab != null && lastTab === tabId && app.tab(tabId) ? { name: 'goals', id: tabId } : { name: 'goals' }, { replace: true });
+      }
       return true;
     },
     onError(err, ctx) {

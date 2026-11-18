@@ -1,5 +1,5 @@
-// Formularios de dinero: aportación (asignar / ahorro nuevo), liberar, mover entre objetivos,
-// pago (con cobertura del faltante), añadir ahorro y registrar salida.
+// Formularios de dinero: aportación (dinero nuevo / desde los ahorros ya registrados), liberar,
+// mover entre objetivos, pago (con cobertura del faltante), añadir ahorro y registrar salida.
 // Todos muestran el efecto antes de confirmar y se recalculan si cambia el estado.
 
 import {
@@ -88,13 +88,19 @@ function ledgerErrorHandler(app) {
 
 // ---------- Añadir aportación ----------
 
+/**
+ * Por defecto, «Aportación nueva» (deposit_to_goal): dinero que ponéis ahora, por ejemplo de la
+ * nómina; entra en los ahorros y queda reservado para el objetivo. La alternativa, «Desde
+ * ahorros ya registrados» (allocate), reserva dinero que ya figura como disponible y se
+ * desactiva, con el motivo, si no hay nada disponible.
+ */
 export function openContribution(app, goalId) {
   const goal = goalOf(app, goalId);
   if (!goal) return;
   const f = moneyFields(app);
   const preview = previewBox();
   const available = () => app.state.savings.available_cents;
-  let mode = available() > 0 ? 'allocate' : 'deposit_to_goal';
+  let mode = 'deposit_to_goal';
   const choice = segmented({
     legend: '¿De dónde sale el dinero?',
     name: 'contrib',
@@ -102,8 +108,8 @@ export function openContribution(app, goalId) {
     fieldName: 'kind',
     value: mode,
     options: [
-      { value: 'allocate', label: 'Asignar de nuestros ahorros', description: '' },
-      { value: 'deposit_to_goal', label: 'Registrar ahorro nuevo', description: 'Dinero que entra ahora y se reserva directamente para este objetivo.' },
+      { value: 'deposit_to_goal', label: 'Aportación nueva', description: 'Dinero que ponéis ahora (de la nómina, un extra…). Se suma a vuestros ahorros y queda reservado para este objetivo.' },
+      { value: 'allocate', label: 'Desde ahorros ya registrados', description: '', disabled: available() <= 0 },
     ],
     onChange: (v) => { mode = v; update(); },
   });
@@ -113,7 +119,13 @@ export function openContribution(app, goalId) {
     const g = goalOf(app, goalId);
     if (!g || !ctxRef) return;
     const avail = available();
-    choice.item('allocate').setDescription(`Disponible: ${formatCents(avail)}`);
+    const fromSavings = choice.item('allocate');
+    fromSavings.setDescription(avail > 0
+      ? `Usa dinero que ya figura como disponible (${formatCents(avail)}).`
+      : `Ahora no se puede: no hay dinero disponible en vuestros ahorros (${formatCents(Math.max(0, avail))}).`);
+    // Si ya estaba elegida y el disponible se agota (otro dispositivo), sigue elegida y el
+    // aviso de abajo bloquea el envío; así nunca cambia de tipo sin que lo veáis.
+    fromSavings.setDisabled(avail <= 0 && mode !== 'allocate');
     const x = f.cents() || 0;
     const reserved = reservedOf(g);
     const nodes = [];
@@ -124,8 +136,8 @@ export function openContribution(app, goalId) {
       if (x > avail) {
         blocked = true;
         nodes.push(problem(avail > 0
-          ? `Solo hay ${formatCents(avail)} disponibles. Elige «Registrar ahorro nuevo» o libera dinero de otro objetivo.`
-          : 'No hay dinero disponible. Elige «Registrar ahorro nuevo» o libera dinero de otro objetivo.'));
+          ? `Solo hay ${formatCents(avail)} disponibles. Si es dinero que ponéis ahora, elegid «Aportación nueva».`
+          : 'No hay dinero disponible. Si es dinero que ponéis ahora, elegid «Aportación nueva».'));
       }
     } else {
       const total = app.state.savings.total_cents;
