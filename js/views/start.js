@@ -2,8 +2,17 @@
 // enlace recién creado, enlace no válido, carga y error de carga.
 
 import { h, icon, button, linkBox, field, textInput, setFieldError, clearFieldErrors, notice } from '../ui.js';
-import { generateSecret } from '../api.js';
+import { generateSecret, isValidSecret } from '../api.js';
 import { spaceLink } from '../router.js';
+
+/** Extrae el secreto de un enlace pegado (dirección completa o solo la parte tras «#»). */
+export function secretFromLink(value) {
+  let v = String(value || '').trim();
+  const i = v.indexOf('#');
+  if (i >= 0) v = v.slice(i + 1);
+  v = v.split('/')[0].trim();
+  return isValidSecret(v) ? v : null;
+}
 
 function screen(...children) {
   return h('div', { class: 'screen' }, h('div', { class: 'screen-card' }, children));
@@ -106,11 +115,36 @@ export function renderHome(app) {
   const form = h('form', { class: 'form home-form', novalidate: true }, codeField, alertBox, createBtn);
   form.addEventListener('submit', (e) => { e.preventDefault(); create(false); });
 
+  // «Ya tenemos un espacio»: entrar pegando el enlace guardado, sin crear otro espacio.
+  const linkInput = textInput({ autocomplete: 'off', spellcheck: 'false', maxlength: 500, placeholder: 'Pegad aquí el enlace completo' });
+  const linkForm = h('form', { class: 'form home-link', novalidate: true },
+    field({ label: 'Vuestro enlace', control: linkInput, name: 'link', hint: 'El que guardasteis al crear el espacio (o pedídselo a la otra persona).' }),
+    button('Entrar en nuestro espacio', null, { variant: 'primary', extraClass: 'btn-block', type: 'submit' }));
+  linkForm.hidden = true;
+  linkForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    clearFieldErrors(linkForm);
+    const secret = secretFromLink(linkInput.value);
+    if (!secret) {
+      setFieldError(linkForm, 'link', 'Ese enlace no parece completo. Copiadlo entero, incluida la parte que va detrás de «#».');
+      linkInput.focus();
+      return;
+    }
+    app.openSpace(secret);
+  });
+  const haveBtn = button('Ya tenemos un espacio', () => {
+    linkForm.hidden = false;
+    haveBtn.hidden = true;
+    linkInput.focus();
+  }, { variant: 'secondary', extraClass: 'btn-block', iconName: 'users' });
+
   const card = screen(
     brandMark(),
     h('h1', { class: 'screen-title' }, 'Vuestros ahorros y objetivos, en común'),
     h('p', { class: 'screen-text' }, 'Un espacio privado para dos personas: cuánto tenéis ahorrado, para qué lo estáis reservando y qué pasos faltan.'),
     form,
+    haveBtn,
+    linkForm,
     demoBtn,
     h('p', { class: 'screen-foot' }, 'No hay cuentas ni contraseñas: entraréis con un enlace privado que podréis compartir entre vosotros.'),
   );

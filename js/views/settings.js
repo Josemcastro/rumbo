@@ -31,6 +31,13 @@ export function renderSettings(app) {
       h('h2', { id: 'link-heading', class: 'section-title' }, 'Enlace del espacio'),
       h('p', { class: 'muted small' }, 'Cualquier persona con este enlace puede ver y editar vuestro espacio.'),
       linkBox(spaceLink(app.secret), { toastFn: app.toast }),
+      isDemo ? null : h('div', { class: 'device-memory' },
+        h('p', { class: 'muted small' }, app.remembersSpace
+          ? 'Este dispositivo recuerda vuestro espacio y lo abre directamente, también desde el icono de la pantalla de inicio.'
+          : 'Este dispositivo no recuerda vuestro espacio: solo se abre con el enlace.'),
+        app.remembersSpace
+          ? button('Olvidar en este dispositivo', () => { app.forgetDevice(); app.toast('Este dispositivo ya no recordará vuestro espacio.'); app.render(); }, { variant: 'plain', small: true, extraClass: 'btn-inline', dataset: { fk: 'forget-device' } })
+          : button('Recordar en este dispositivo', () => { app.rememberDevice(); app.toast('Este dispositivo recordará vuestro espacio.'); app.render(); }, { variant: 'plain', small: true, extraClass: 'btn-inline', dataset: { fk: 'remember-device' } })),
       h('div', { class: 'danger-zone' },
         h('h3', { class: 'subsection-title' }, 'Regenerar enlace'),
         h('p', { class: 'muted small' }, 'Crea un enlace nuevo y anula el actual. Úsalo si el enlace se ha compartido con alguien que no debería tenerlo.'),
@@ -41,5 +48,5 @@ export function renderSettings(app) {
       h('p', { class: 'muted small' }, `Creado el ${formatDateTime(space.created_at) || '—'}.`),
       h('p', { class: 'muted small' }, app.backendKind === 'pglite'
         ? 'Modo de pruebas locales: los datos están en la base de datos de este navegador.'
-        : 'Los datos se guardan en vuestra base de datos de Supabase. El enlace no se guarda en ningún sitio: solo está en la dirección de esta página.')));
+        : 'Los datos se guardan en vuestra base de datos de Supabase. El enlace solo está en la dirección de esta página y, si lo permitís, en la memoria de este dispositivo; nunca se envía a terceros.')));
 }
